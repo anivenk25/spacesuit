@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Catppuccin Mocha borders
+# Mauve for focused, Surface2 for unfocused
+
+borders active_color=0xbf7f849c \
+        inactive_color=0x4045475a \
+        width=2.0 \
+        style=round \
+        hidpi=on \
+        order=above \
+        blacklist="Spotlight,Alfred,choose"

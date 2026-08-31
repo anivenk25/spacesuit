@@ -64,9 +64,7 @@ for sid in 1 2 3 4 5 6 7 8 9 10; do
       icon.padding_right=4 \
       label.padding_left=2 \
       label.padding_right=10 \
-      click_script="aerospace workspace $sid" \
-      script="$PLUGIN_DIR/aerospace.sh $sid" \
-    --subscribe space.$sid aerospace_workspace_change
+      click_script="aerospace workspace $sid"
 done
 
 ##### Separator #####
@@ -103,9 +101,7 @@ for sid in A B C D E F; do
       icon.padding_right=4 \
       label.padding_left=2 \
       label.padding_right=10 \
-      click_script="aerospace workspace $sid" \
-      script="$PLUGIN_DIR/aerospace.sh $sid" \
-    --subscribe space.$sid aerospace_workspace_change
+      click_script="aerospace workspace $sid"
 done
 
 ##### Separator #####
@@ -136,7 +132,7 @@ sketchybar --add item front_app left \
     script="$PLUGIN_DIR/front_app.sh" \
   --subscribe front_app front_app_switched
 
-##### Focused Window Title (right side) #####
+##### Focused Window Title (right side — rightmost) #####
 sketchybar --add item window_title right \
   --set window_title \
     icon="" \
@@ -153,6 +149,51 @@ sketchybar --add item window_title right \
     background.border_width=0 \
     script="$PLUGIN_DIR/window_title.sh" \
     update_freq=2
+
+##### Top 5 Apps (right side, before window title) #####
+sketchybar --add item top_label right \
+  --set top_label \
+    icon="alt-o" \
+    icon.font="Hack Nerd Font:Bold:9.0" \
+    icon.color=0xff585b70 \
+    icon.padding_left=6 \
+    icon.padding_right=6 \
+    label.drawing=off \
+    background.color=0xff181825 \
+    background.border_width=0 \
+    background.height=18 \
+    background.corner_radius=4
+
+for idx in 1 2 3 4 5; do
+  sketchybar --add item top_app.$idx right \
+    --set top_app.$idx \
+      icon="" \
+      icon.font="Hack Nerd Font:Bold:11.0" \
+      icon.color=0xffcba6f7 \
+      icon.padding_left=6 \
+      icon.padding_right=2 \
+      label="" \
+      label.drawing=on \
+      label.font="Hack Nerd Font:Regular:10.0" \
+      label.color=0xffa6adc8 \
+      label.padding_right=6 \
+      background.color=0xff1e1e2e \
+      background.corner_radius=6 \
+      background.height=22 \
+      background.border_width=0 \
+      click_script="~/.config/aerospace/scripts/launch-top.sh $idx" \
+      drawing=off
+done
+
+# Initial top 5 update
+exec ~/.config/aerospace/scripts/update-top5.sh &
+
+##### Workspace update trigger (single script updates all 16 items) #####
+sketchybar --add item ws_trigger left \
+  --set ws_trigger \
+    drawing=off \
+    script="$PLUGIN_DIR/update-all-workspaces.sh" \
+  --subscribe ws_trigger aerospace_workspace_change
 
 ##### Force refresh #####
 sketchybar --update

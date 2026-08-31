@@ -2,19 +2,20 @@
 
 SID="$1"
 
+# Use event variable — passed by sketchybar trigger
 FOCUSED="$FOCUSED_WORKSPACE"
-if [ -z "$FOCUSED" ]; then
-  FOCUSED="$AEROSPACE_FOCUSED_WORKSPACE"
-fi
 
 WIN_COUNT=$(aerospace list-windows --workspace "$SID" 2>/dev/null | wc -l | tr -d ' ')
 
 IS_VISIBLE=false
-for ws in $(aerospace list-workspaces --monitor all --visible 2>/dev/null); do
-  if [ "$ws" = "$SID" ]; then
-    IS_VISIBLE=true
-  fi
-done
+MONITOR_COUNT=$(aerospace list-monitors 2>/dev/null | wc -l | tr -d ' ')
+if [ "$MONITOR_COUNT" -gt 1 ]; then
+  for ws in $(aerospace list-workspaces --monitor all --visible 2>/dev/null); do
+    if [ "$ws" = "$SID" ] && [ "$ws" != "$FOCUSED" ]; then
+      IS_VISIBLE=true
+    fi
+  done
+fi
 
 APPS=""
 if [ "$WIN_COUNT" -gt 0 ]; then
@@ -27,7 +28,6 @@ if [ "$WIN_COUNT" -gt 0 ]; then
 fi
 
 if [ "$SID" = "$FOCUSED" ]; then
-  # FOCUSED — bright mauve bg, bold
   LABEL="[$WIN_COUNT] $APPS"
   sketchybar --set "$NAME" \
     background.color=0xffcba6f7 \
@@ -39,7 +39,6 @@ if [ "$SID" = "$FOCUSED" ]; then
     label="$LABEL"
 
 elif [ "$IS_VISIBLE" = true ]; then
-  # VISIBLE on other monitor — blue bg
   if [ "$WIN_COUNT" -gt 0 ]; then
     LABEL="[$WIN_COUNT] $APPS"
   else
@@ -55,7 +54,6 @@ elif [ "$IS_VISIBLE" = true ]; then
     label="$LABEL"
 
 elif [ "$WIN_COUNT" -gt 0 ]; then
-  # HAS WINDOWS — teal text, visible
   LABEL="[$WIN_COUNT] $APPS"
   sketchybar --set "$NAME" \
     background.color=0xff313244 \
@@ -67,7 +65,6 @@ elif [ "$WIN_COUNT" -gt 0 ]; then
     label="$LABEL"
 
 else
-  # EMPTY — dim overlay
   sketchybar --set "$NAME" \
     background.color=0xff1e1e2e \
     icon.color=0xff45475a \
