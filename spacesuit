@@ -200,7 +200,14 @@ cmd_doctor() {
 
 cmd_help() {
   echo ""
-  echo -e "${PURPLE}${BOLD}Spacesuit${NC} — macOS tiling WM setup"
+  echo -e "${PURPLE}${BOLD}   ____                              _ _${NC}"
+  echo -e "${PURPLE}${BOLD}  / ___| _ __   __ _  ___ ___  ___ _   _(_) |_${NC}"
+  echo -e "${PURPLE}${BOLD}  \\___ \\| '_ \\ / _\` |/ __/ _ \\/ __| | | | | __|${NC}"
+  echo -e "${PURPLE}${BOLD}   ___) | |_) | (_| | (_|  __/\\__ \\ |_| | | |_${NC}"
+  echo -e "${PURPLE}${BOLD}  |____/| .__/ \\__,_|\\___\\___||___/\\__,_|_|\\__|${NC}"
+  echo -e "${PURPLE}${BOLD}        |_|${NC}"
+  echo ""
+  echo -e "  macOS tiling WM setup"
   echo ""
   echo -e "  ${BOLD}Usage:${NC} spacesuit <command>"
   echo ""
@@ -217,9 +224,8 @@ cmd_help() {
   echo -e "    SketchyBar   Workspace status bar"
   echo -e "    Kitty        Terminal emulator"
   echo -e "    Borders      Window border highlights"
-  echo -e "    Ice          Menu bar manager"
   echo ""
-  echo -e "  ${BOLD}Source:${NC} https://github.com/anivenk25/dotfiles"
+  echo -e "  ${BOLD}Source:${NC} https://github.com/anivenk25/spacesuit"
   echo ""
 }
 

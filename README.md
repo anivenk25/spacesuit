@@ -1,5 +1,14 @@
 # Spacesuit
 
+```
+   ____                              _ _
+  / ___| _ __   __ _  ___ ___  ___ _   _(_) |_
+  \___ \| '_ \ / _` |/ __/ _ \/ __| | | | | __|
+   ___) | |_) | (_| | (_|  __/\__ \ |_| | | |_
+  |____/| .__/ \__,_|\___\___||___/\__,_|_|\__|
+        |_|
+```
+
 Complete macOS tiling window manager setup in one command.
 
 AeroSpace + Kitty + SketchyBar + JankyBorders — Catppuccin Mocha themed.
