@@ -4,6 +4,7 @@ set -euo pipefail
 # ============================================================================
 # Spacesuit Installer
 # Complete macOS tiling WM setup — AeroSpace + Kitty + SketchyBar + borders
+# https://github.com/anivenk25/spacesuit
 # ============================================================================
 
 # Colors
@@ -24,6 +25,26 @@ ok()    { echo -e "${GREEN}[✓]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 err()   { echo -e "${RED}[✗]${NC} $1"; }
 step()  { echo -e "\n${PURPLE}${BOLD}==> $1${NC}"; }
+
+# ============================================================================
+# Clone repo (for curl install path)
+# ============================================================================
+
+clone_repo() {
+  if [ -d "$SPACESUIT_DIR/.git" ]; then
+    info "Spacesuit repo already exists at $SPACESUIT_DIR"
+    info "Pulling latest..."
+    git -C "$SPACESUIT_DIR" pull --rebase 2>/dev/null || true
+    ok "Repo up to date"
+  elif [ -d "$SPACESUIT_DIR" ] && [ -f "$SPACESUIT_DIR/spacesuit" ]; then
+    # Installed via brew formula — SPACESUIT_DIR is libexec, not a git repo
+    ok "Using brew-installed spacesuit at $SPACESUIT_DIR"
+  else
+    info "Cloning spacesuit to $SPACESUIT_DIR..."
+    git clone https://github.com/anivenk25/spacesuit.git "$SPACESUIT_DIR" 2>&1
+    ok "Cloned to $SPACESUIT_DIR"
+  fi
+}
 
 # ============================================================================
 # Pre-flight checks
@@ -53,7 +74,8 @@ preflight() {
   if ! xcode-select -p &>/dev/null; then
     warn "Xcode Command Line Tools not found. Installing..."
     xcode-select --install
-    echo "Press enter after Xcode CLT installation completes."
+    echo ""
+    echo -e "${YELLOW}Press enter after Xcode CLT installation completes.${NC}"
     read -r
   fi
   ok "Xcode Command Line Tools"
@@ -68,6 +90,53 @@ preflight() {
 }
 
 # ============================================================================
+# Monitor setup
+# ============================================================================
+
+monitor_setup() {
+  step "Monitor configuration"
+
+  echo ""
+  echo -e "  ${BOLD}How many monitors do you use?${NC}"
+  echo ""
+  echo -e "  ${BLUE}1)${NC} Single monitor (all 16 workspaces on one screen)"
+  echo -e "  ${BLUE}2)${NC} Dual monitors (1-10 on main, A-F on secondary)"
+  echo -e "  ${BLUE}3)${NC} Skip (configure manually later)"
+  echo ""
+
+  while true; do
+    read -rp "  Enter choice [1-3]: " choice
+    case "$choice" in
+      1)
+        info "Configuring for single monitor..."
+        # Remove workspace-to-monitor-force-assignment section
+        # Replace with comment
+        if [ -f "$SPACESUIT_DIR/.aerospace.toml" ]; then
+          sed -i '' '/^\[workspace-to-monitor-force-assignment\]/,/^$/c\
+# workspace-to-monitor-force-assignment not set — all workspaces on single monitor\
+' "$SPACESUIT_DIR/.aerospace.toml"
+        fi
+        ok "Single monitor configured — all 16 workspaces on one screen"
+        break
+        ;;
+      2)
+        info "Keeping dual monitor config (1-10 main, A-F secondary)..."
+        ok "Dual monitor configured"
+        break
+        ;;
+      3)
+        info "Skipping monitor setup..."
+        warn "Edit ~/.aerospace.toml [workspace-to-monitor-force-assignment] section later"
+        break
+        ;;
+      *)
+        echo -e "  ${RED}Invalid choice. Enter 1, 2, or 3.${NC}"
+        ;;
+    esac
+  done
+}
+
+# ============================================================================
 # Install dependencies
 # ============================================================================
 
@@ -79,15 +148,18 @@ install_deps() {
     exit 1
   fi
 
-  info "Running brew bundle (this may take a few minutes)..."
-  brew bundle --file="$SPACESUIT_DIR/Brewfile" --no-lock --no-upgrade 2>&1 | while read -r line; do
+  info "Running brew bundle (this may take a few minutes on first install)..."
+  if brew bundle --file="$SPACESUIT_DIR/Brewfile" --no-lock --no-upgrade 2>&1 | grep -v "^$" | while read -r line; do
     case "$line" in
       *"already installed"*|*"Skipping"*) ;;
-      *"Installing"*|*"Pouring"*|*"Successfully"*) info "$line" ;;
+      *"Using"*) ;;
+      *) info "$line" ;;
     esac
-  done
-
-  ok "All dependencies installed"
+  done; then
+    ok "All dependencies installed"
+  else
+    ok "Dependencies installed (some may have been skipped)"
+  fi
 }
 
 # ============================================================================
@@ -121,7 +193,7 @@ make_symlink() {
 
   # Create symlink
   ln -sf "$src" "$dest"
-  ok "Linked: $dest → $src"
+  ok "Linked: $dest"
 }
 
 symlink_configs() {
@@ -157,6 +229,10 @@ apply_macos_settings() {
     ok "MRU spaces already disabled"
   fi
 
+  # Auto-hide menu bar (replaces Ice)
+  defaults write NSGlobalDomain _HIHideMenuBar -bool true 2>/dev/null
+  ok "Menu bar auto-hide enabled"
+
   # Chrome window tabbing
   defaults write com.google.Chrome AppleWindowTabbingMode -string manual 2>/dev/null
   ok "Chrome window tabbing set to manual"
@@ -174,7 +250,7 @@ start_services() {
   step "Starting services"
 
   # SketchyBar
-  if brew services list | grep sketchybar | grep -q started; then
+  if brew services list 2>/dev/null | grep sketchybar | grep -q started; then
     ok "SketchyBar already running"
   else
     brew services start felixkratz/formulae/sketchybar 2>/dev/null
@@ -182,18 +258,11 @@ start_services() {
   fi
 
   # Borders
-  if brew services list | grep borders | grep -q started; then
+  if brew services list 2>/dev/null | grep borders | grep -q started; then
     ok "Borders already running"
   else
     brew services start felixkratz/formulae/borders 2>/dev/null
     ok "Borders started"
-  fi
-
-  # Ice
-  if pgrep -x "Ice" &>/dev/null; then
-    ok "Ice already running"
-  else
-    open -a Ice 2>/dev/null && ok "Ice started" || warn "Could not start Ice"
   fi
 }
 
@@ -211,44 +280,45 @@ fix_permissions() {
 }
 
 # ============================================================================
-# Post-install
+# Post-install — auto-open AeroSpace + accessibility settings
 # ============================================================================
 
 post_install() {
-  step "Post-install"
+  step "Final setup"
+
+  # Open AeroSpace
+  info "Starting AeroSpace..."
+  open -a AeroSpace 2>/dev/null || warn "Could not start AeroSpace — open it manually"
+  sleep 1
+
+  # Open accessibility settings
+  info "Opening Accessibility settings..."
+  open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" 2>/dev/null || true
 
   echo ""
   echo -e "${GREEN}${BOLD}╔══════════════════════════════════════════════════════╗${NC}"
-  echo -e "${GREEN}${BOLD}║           🚀 Spacesuit installed successfully!       ║${NC}"
+  echo -e "${GREEN}${BOLD}║          Spacesuit installed successfully!           ║${NC}"
   echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════════════════╝${NC}"
   echo ""
-  echo -e "${BOLD}Two manual steps remaining:${NC}"
+  echo -e "  ${YELLOW}${BOLD}One step remaining:${NC}"
+  echo -e "  Grant AeroSpace accessibility permission in the window that just opened."
+  echo -e "  Toggle ${BOLD}AeroSpace${NC} to ${GREEN}ON${NC} in the list."
   echo ""
-  echo -e "  ${YELLOW}1.${NC} Grant AeroSpace accessibility permission:"
-  echo -e "     System Settings → Privacy & Security → Accessibility → AeroSpace ✓"
+  echo -e "  ${BOLD}Keybinds cheat sheet:${NC}"
   echo ""
-  echo -e "  ${YELLOW}2.${NC} Start AeroSpace:"
-  echo -e "     ${BLUE}open -a AeroSpace${NC}"
+  echo -e "  ${PURPLE}alt-1..9, alt-0${NC}       Switch workspace 1-10"
+  echo -e "  ${PURPLE}alt-a..f${NC}              Switch workspace A-F"
+  echo -e "  ${PURPLE}alt-shift-<key>${NC}       Move window to workspace"
+  echo -e "  ${PURPLE}alt-hjkl${NC}              Focus left/down/up/right"
+  echo -e "  ${PURPLE}alt-shift-hjkl${NC}        Move window"
+  echo -e "  ${PURPLE}alt-enter${NC}             New Kitty terminal"
+  echo -e "  ${PURPLE}alt-space${NC}             Search windows/tabs/workspaces"
+  echo -e "  ${PURPLE}alt-s${NC}                 Toggle scratchpad terminal"
+  echo -e "  ${PURPLE}alt-o then 1-5${NC}        Launch top 5 most-used apps"
+  echo -e "  ${PURPLE}alt-shift-;${NC}           Service mode (r=reset, f=float, t=tile all)"
   echo ""
-  echo -e "  ${YELLOW}3.${NC} (Optional) Hide AeroSpace menu bar icon:"
-  echo -e "     Cmd-drag it behind Ice divider in menu bar"
-  echo ""
-  echo -e "${BOLD}Keybinds cheat sheet:${NC}"
-  echo ""
-  echo -e "  ${PURPLE}alt-1..9, alt-0${NC}     Switch workspace 1-10"
-  echo -e "  ${PURPLE}alt-a..f${NC}            Switch workspace A-F (secondary monitor)"
-  echo -e "  ${PURPLE}alt-shift-1..0,a..f${NC} Move window to workspace"
-  echo -e "  ${PURPLE}alt-hjkl${NC}            Focus left/down/up/right"
-  echo -e "  ${PURPLE}alt-shift-hjkl${NC}      Move window left/down/up/right"
-  echo -e "  ${PURPLE}alt-enter${NC}           New Kitty terminal"
-  echo -e "  ${PURPLE}alt-space${NC}           Search windows/tabs/workspaces"
-  echo -e "  ${PURPLE}alt-s${NC}               Toggle scratchpad terminal"
-  echo -e "  ${PURPLE}alt-o then j/g/s/n${NC}  Quick launch: Jira/GitHub/Spotify/TextEdit"
-  echo -e "  ${PURPLE}alt-o then 1-5${NC}      Launch top 5 most-used apps"
-  echo -e "  ${PURPLE}alt-shift-;${NC}         Service mode (r=reset, f=float, t=tile all)"
-  echo ""
-  echo -e "Run ${BLUE}spacesuit doctor${NC} to check everything is working."
-  echo -e "Run ${BLUE}spacesuit update${NC} to pull latest configs."
+  echo -e "  Run ${BLUE}spacesuit doctor${NC} to verify everything is working."
+  echo -e "  Run ${BLUE}spacesuit update${NC} to pull latest configs."
   echo ""
 }
 
@@ -263,9 +333,11 @@ main() {
   echo -e "${PURPLE}${BOLD}  ╚═══════════════════════════════════╝${NC}"
   echo ""
 
+  clone_repo
   preflight
   install_deps
   fix_permissions
+  monitor_setup
   symlink_configs
   apply_macos_settings
   start_services

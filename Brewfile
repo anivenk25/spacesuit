@@ -9,6 +9,5 @@ brew "fzf"
 brew "choose-gui"
 
 cask "kitty"
-cask "jordanbaird-ice"
 cask "sf-symbols"
 cask "font-hack-nerd-font"

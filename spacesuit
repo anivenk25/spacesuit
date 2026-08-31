@@ -67,13 +67,6 @@ cmd_status() {
     fail "AeroSpace not running"
   fi
 
-  # Ice
-  if pgrep -x "Ice" &>/dev/null; then
-    ok "Ice running"
-  else
-    warn "Ice not running"
-  fi
-
   echo ""
   echo -e "${BOLD}Workspaces:${NC}"
   if command -v aerospace &>/dev/null && pgrep -x "AeroSpace" &>/dev/null; then
@@ -130,13 +123,6 @@ cmd_doctor() {
   else
     fail "Kitty not installed"
     ISSUES=$((ISSUES + 1))
-  fi
-
-  # Ice
-  if [ -d "/Applications/Ice.app" ]; then
-    ok "Ice installed"
-  else
-    warn "Ice not installed (optional)"
   fi
 
   # Fonts
