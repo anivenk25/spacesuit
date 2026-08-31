@@ -96,21 +96,39 @@ preflight() {
 monitor_setup() {
   step "Monitor configuration"
 
+  # Non-interactive mode (e.g. piped from brew post_install)
+  if [ ! -t 0 ]; then
+    # Auto-detect: check how many monitors are connected
+    if command -v aerospace &>/dev/null && aerospace list-monitors &>/dev/null 2>&1; then
+      MON_COUNT=$(aerospace list-monitors 2>/dev/null | wc -l | tr -d ' ')
+      if [ "$MON_COUNT" -gt 1 ]; then
+        info "Detected $MON_COUNT monitors — using dual monitor config"
+        ok "Dual monitor configured"
+      else
+        info "Detected 1 monitor — keeping dual config (works on single too)"
+        ok "Config ready (works with 1 or 2 monitors)"
+      fi
+    else
+      info "AeroSpace not running — keeping default dual monitor config"
+      ok "Config ready"
+    fi
+    return
+  fi
+
   echo ""
   echo -e "  ${BOLD}How many monitors do you use?${NC}"
   echo ""
   echo -e "  ${BLUE}1)${NC} Single monitor (all 16 workspaces on one screen)"
-  echo -e "  ${BLUE}2)${NC} Dual monitors (1-10 on main, A-F on secondary)"
+  echo -e "  ${BLUE}2)${NC} Dual monitors (1-10 on main, A-F on secondary) ${GREEN}[default]${NC}"
   echo -e "  ${BLUE}3)${NC} Skip (configure manually later)"
   echo ""
 
   while true; do
-    read -rp "  Enter choice [1-3]: " choice
+    read -rp "  Enter choice [1-3] (default: 2): " choice
+    choice="${choice:-2}"
     case "$choice" in
       1)
         info "Configuring for single monitor..."
-        # Remove workspace-to-monitor-force-assignment section
-        # Replace with comment
         if [ -f "$SPACESUIT_DIR/.aerospace.toml" ]; then
           sed -i '' '/^\[workspace-to-monitor-force-assignment\]/,/^$/c\
 # workspace-to-monitor-force-assignment not set — all workspaces on single monitor\
