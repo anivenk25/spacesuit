@@ -29,7 +29,7 @@ fi
 
 # Update deps
 step "Updating dependencies"
-brew bundle --file="$SPACESUIT_DIR/Brewfile" --no-lock --no-upgrade 2>/dev/null
+brew bundle --file="$SPACESUIT_DIR/Brewfile" --no-upgrade 2>/dev/null
 ok "Dependencies up to date"
 
 # Fix permissions

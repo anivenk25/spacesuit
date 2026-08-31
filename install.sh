@@ -167,7 +167,7 @@ install_deps() {
   fi
 
   info "Running brew bundle (this may take a few minutes on first install)..."
-  if brew bundle --file="$SPACESUIT_DIR/Brewfile" --no-lock --no-upgrade 2>&1 | grep -v "^$" | while read -r line; do
+  if brew bundle --file="$SPACESUIT_DIR/Brewfile" --no-upgrade 2>&1 | grep -v "^$" | while read -r line; do
     case "$line" in
       *"already installed"*|*"Skipping"*) ;;
       *"Using"*) ;;
