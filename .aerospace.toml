@@ -1,0 +1,158 @@
+# AeroSpace config - multi-display tiling setup
+config-version = 2
+
+start-at-login = true
+auto-reload-config = true
+
+# Normalizations
+enable-normalization-flatten-containers = true
+enable-normalization-opposite-orientation-for-nested-containers = true
+
+accordion-padding = 30
+default-root-container-layout = 'tiles'
+default-root-container-orientation = 'auto'
+
+# Mouse follows focused monitor
+on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
+
+# Notify SketchyBar on workspace change + save state
+exec-on-workspace-change = ['/bin/bash', '-c',
+  'sketchybar --trigger aerospace_workspace_change FOCUSED_WORKSPACE=$AEROSPACE_FOCUSED_WORKSPACE; ~/.config/aerospace/scripts/save-state.sh'
+]
+
+# Start SketchyBar and restore window layout
+after-startup-command = ['exec-and-forget sketchybar', 'exec-and-forget ~/.config/aerospace/scripts/restore-state.sh']
+
+# Gaps
+gaps.inner.horizontal = 10
+gaps.inner.vertical = 10
+gaps.outer.left = 10
+gaps.outer.bottom =     48
+gaps.outer.top =        10
+gaps.outer.right =      10
+
+# Keep workspaces alive even when empty
+persistent-workspaces = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'A', 'B', 'C', 'D', 'E', 'F']
+
+# Assign workspaces to monitors
+# 1-10 on main, A-F on secondary display
+[workspace-to-monitor-force-assignment]
+1 = 'main'
+2 = 'main'
+3 = 'main'
+4 = 'main'
+5 = 'main'
+6 = 'main'
+7 = 'main'
+8 = 'main'
+9 = 'main'
+10 = 'main'
+A = 'secondary'
+B = 'secondary'
+C = 'secondary'
+D = 'secondary'
+E = 'secondary'
+F = 'secondary'
+
+# Main keybindings
+[mode.main.binding]
+
+# Launch terminal
+alt-enter = 'exec-and-forget open -n -a /Applications/kitty.app'
+
+# Layout
+alt-slash = 'layout tiles horizontal vertical'
+alt-comma = 'layout accordion horizontal vertical'
+
+# Focus (vim keys)
+alt-h = 'focus left'
+alt-j = 'focus down'
+alt-k = 'focus up'
+alt-l = 'focus right'
+
+# Move window (vim keys)
+alt-shift-h = 'move left'
+alt-shift-j = 'move down'
+alt-shift-k = 'move up'
+alt-shift-l = 'move right'
+
+# Resize
+alt-minus = 'resize smart -50'
+alt-equal = 'resize smart +50'
+
+# Switch workspace
+alt-1 = 'workspace 1'
+alt-2 = 'workspace 2'
+alt-3 = 'workspace 3'
+alt-4 = 'workspace 4'
+alt-5 = 'workspace 5'
+alt-6 = 'workspace 6'
+alt-7 = 'workspace 7'
+alt-8 = 'workspace 8'
+alt-9 = 'workspace 9'
+alt-0 = 'workspace 10'
+alt-a = 'workspace A'
+alt-b = 'workspace B'
+alt-c = 'workspace C'
+alt-d = 'workspace D'
+alt-e = 'workspace E'
+alt-f = 'workspace F'
+
+# Move window to workspace (+ refresh bar)
+alt-shift-1 = ['move-node-to-workspace 1', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-2 = ['move-node-to-workspace 2', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-3 = ['move-node-to-workspace 3', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-4 = ['move-node-to-workspace 4', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-5 = ['move-node-to-workspace 5', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-6 = ['move-node-to-workspace 6', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-7 = ['move-node-to-workspace 7', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-8 = ['move-node-to-workspace 8', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-9 = ['move-node-to-workspace 9', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-0 = ['move-node-to-workspace 10', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-a = ['move-node-to-workspace A', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-b = ['move-node-to-workspace B', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-c = ['move-node-to-workspace C', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-d = ['move-node-to-workspace D', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-e = ['move-node-to-workspace E', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+alt-shift-f = ['move-node-to-workspace F', 'exec-and-forget ~/.config/aerospace/scripts/refresh-bar.sh']
+
+# Monitor navigation
+alt-tab = 'workspace-back-and-forth'
+alt-shift-tab = 'move-workspace-to-monitor --wrap-around next'
+alt-backtick = 'focus-monitor --wrap-around next'
+alt-shift-backtick = 'move-node-to-monitor --wrap-around next'
+
+# Fullscreen (toggle)
+alt-shift-g = 'fullscreen'
+
+# Service mode
+alt-shift-semicolon = 'mode service'
+
+# Open mode (alt-o then key to launch)
+alt-o = 'mode open'
+
+# Search windows + Chrome tabs (fuzzy finder)
+alt-space = 'exec-and-forget ~/.config/aerospace/scripts/search-all.sh'
+
+# Search and move window to workspace
+alt-shift-space = 'exec-and-forget aerospace list-workspaces --all | choose | xargs -I{} bash -c "aerospace move-node-to-workspace {} && ~/.config/aerospace/scripts/refresh-bar.sh"'
+
+# Service mode keybindings
+[mode.service.binding]
+esc = ['reload-config', 'mode main']
+r = ['flatten-workspace-tree', 'mode main']
+f = ['layout floating tiling', 'mode main']
+t = ['exec-and-forget ~/.config/aerospace/scripts/force-tile-workspace.sh', 'mode main']
+backspace = ['close-all-windows-but-current', 'mode main']
+alt-shift-h = ['join-with left', 'mode main']
+alt-shift-j = ['join-with down', 'mode main']
+alt-shift-k = ['join-with up', 'mode main']
+alt-shift-l = ['join-with right', 'mode main']
+
+# Open mode - quick launcher (alt-o to enter, then press key)
+[mode.open.binding]
+esc = 'mode main'
+j = ['exec-and-forget open "https://jira.tools.sap/secure/Dashboard.jspa"', 'mode main']
+g = ['exec-and-forget open "https://github.tools.sap/I774364?tab=repositories"', 'mode main']
+n = ['exec-and-forget open -n -a TextEdit', 'mode main']
+s = ['exec-and-forget open "https://open.spotify.com/"', 'mode main']
