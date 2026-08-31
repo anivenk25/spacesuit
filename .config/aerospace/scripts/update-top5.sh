@@ -19,7 +19,7 @@ while IFS=$'\t' read -r count app; do
   # Map app name to launch command
   case "$app" in
     "Google Chrome") TOP_CMDS[$i]="open -a 'Google Chrome'"; TOP_ICONS[$i]="" ;;
-    kitty)           TOP_CMDS[$i]="open -n -a /Applications/kitty.app"; TOP_ICONS[$i]="" ;;
+    kitty)           TOP_CMDS[$i]="open -a Terminal"; TOP_ICONS[$i]="" ;;
     "Microsoft Outlook") TOP_CMDS[$i]="open -a 'Microsoft Outlook'"; TOP_ICONS[$i]="" ;;
     "Microsoft Teams")   TOP_CMDS[$i]="open -a 'Microsoft Teams'"; TOP_ICONS[$i]="" ;;
     "Visual Studio Code") TOP_CMDS[$i]="open -a 'Visual Studio Code'"; TOP_ICONS[$i]="" ;;

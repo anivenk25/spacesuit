@@ -18,7 +18,7 @@ if [ -f "$FREQ_FILE" ]; then
     [ -z "$app" ] && continue
     case "$app" in
       "Google Chrome") cmd="open -a 'Google Chrome'" ;;
-      kitty) cmd="open -n -a /Applications/kitty.app" ;;
+      kitty) cmd="open -a Terminal" ;;
       "Microsoft Outlook") cmd="open -a 'Microsoft Outlook'" ;;
       "Microsoft Teams") cmd="open -a 'Microsoft Teams'" ;;
       "Visual Studio Code") cmd="open -a 'Visual Studio Code'" ;;
@@ -40,7 +40,7 @@ if [ -f "$HOUR_FILE" ]; then
     [ -z "$app" ] && continue
     case "$app" in
       "Google Chrome") cmd="open -a 'Google Chrome'" ;;
-      kitty) cmd="open -n -a /Applications/kitty.app" ;;
+      kitty) cmd="open -a Terminal" ;;
       "Microsoft Outlook") cmd="open -a 'Microsoft Outlook'" ;;
       "Microsoft Teams") cmd="open -a 'Microsoft Teams'" ;;
       *) cmd="open -a '$app'" ;;
@@ -61,7 +61,7 @@ url:https://chat.openai.com | ChatGPT
 
 # ---- Section 4: Quick actions ----
 items="${items}--- Actions ---
-action:new-terminal | New Terminal (Kitty)
+action:new-terminal | New Terminal
 action:new-chrome | New Chrome Window
 action:new-note | New TextEdit Note
 action:lock-screen | Lock Screen
@@ -107,7 +107,7 @@ case "$type" in
   action)
     action=$(echo "$prefix" | cut -d: -f2-)
     case "$action" in
-      new-terminal) open -n -a /Applications/kitty.app ;;
+      new-terminal) osascript -e 'tell application "Terminal" to do script ""' ;;
       new-chrome) open -na "Google Chrome" --args --new-window ;;
       new-note) open -n -a TextEdit ;;
       lock-screen) pmset displaysleepnow ;;

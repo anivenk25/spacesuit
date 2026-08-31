@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ============================================================================
 # Spacesuit Installer
-# Complete macOS tiling WM setup — AeroSpace + Kitty + SketchyBar + borders
+# Complete macOS tiling WM setup — AeroSpace + SketchyBar + borders
 # https://github.com/anivenk25/spacesuit
 # ============================================================================
 
@@ -219,7 +219,6 @@ symlink_configs() {
 
   make_symlink "$SPACESUIT_DIR/.aerospace.toml" "$HOME/.aerospace.toml"
   make_symlink "$SPACESUIT_DIR/.config/sketchybar" "$HOME/.config/sketchybar"
-  make_symlink "$SPACESUIT_DIR/.config/kitty" "$HOME/.config/kitty"
   make_symlink "$SPACESUIT_DIR/.config/borders" "$HOME/.config/borders"
   make_symlink "$SPACESUIT_DIR/.config/aerospace" "$HOME/.config/aerospace"
 }
@@ -329,7 +328,7 @@ post_install() {
   echo -e "  ${PURPLE}alt-shift-<key>${NC}       Move window to workspace"
   echo -e "  ${PURPLE}alt-hjkl${NC}              Focus left/down/up/right"
   echo -e "  ${PURPLE}alt-shift-hjkl${NC}        Move window"
-  echo -e "  ${PURPLE}alt-enter${NC}             New Kitty terminal"
+  echo -e "  ${PURPLE}alt-enter${NC}             New terminal"
   echo -e "  ${PURPLE}alt-space${NC}             Search windows/tabs/workspaces"
   echo -e "  ${PURPLE}alt-s${NC}                 Toggle scratchpad terminal"
   echo -e "  ${PURPLE}alt-o then 1-5${NC}        Launch top 5 most-used apps"

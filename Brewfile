@@ -8,6 +8,5 @@ brew "bash"
 brew "fzf"
 brew "choose-gui"
 
-cask "kitty"
 cask "sf-symbols"
 cask "font-hack-nerd-font"

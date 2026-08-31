@@ -40,7 +40,7 @@ cmd_status() {
 
   # Symlinks
   echo -e "${BOLD}Symlinks:${NC}"
-  for target in "$HOME/.aerospace.toml" "$HOME/.config/sketchybar" "$HOME/.config/kitty" "$HOME/.config/borders" "$HOME/.config/aerospace"; do
+  for target in "$HOME/.aerospace.toml" "$HOME/.config/sketchybar" "$HOME/.config/borders" "$HOME/.config/aerospace"; do
     if [ -L "$target" ]; then
       ok "$target → $(readlink "$target")"
     elif [ -e "$target" ]; then
@@ -117,14 +117,6 @@ cmd_doctor() {
     fi
   done
 
-  # Kitty
-  if [ -d "/Applications/kitty.app" ]; then
-    ok "Kitty installed"
-  else
-    fail "Kitty not installed"
-    ISSUES=$((ISSUES + 1))
-  fi
-
   # Fonts
   if ls ~/Library/Fonts/HackNerdFont* &>/dev/null 2>&1; then
     ok "Hack Nerd Font installed"
@@ -134,7 +126,7 @@ cmd_doctor() {
   fi
 
   # Symlinks
-  for target in "$HOME/.aerospace.toml" "$HOME/.config/sketchybar" "$HOME/.config/kitty" "$HOME/.config/borders" "$HOME/.config/aerospace"; do
+  for target in "$HOME/.aerospace.toml" "$HOME/.config/sketchybar" "$HOME/.config/borders" "$HOME/.config/aerospace"; do
     if [ -L "$target" ] && [ -e "$target" ]; then
       ok "Symlink valid: $(basename "$target")"
     elif [ -L "$target" ]; then
@@ -222,7 +214,6 @@ cmd_help() {
   echo -e "  ${BOLD}Components:${NC}"
   echo -e "    AeroSpace    Tiling window manager"
   echo -e "    SketchyBar   Workspace status bar"
-  echo -e "    Kitty        Terminal emulator"
   echo -e "    Borders      Window border highlights"
   echo ""
   echo -e "  ${BOLD}Source:${NC} https://github.com/anivenk25/spacesuit"

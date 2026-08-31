@@ -57,8 +57,8 @@ F = 'secondary'
 # Main keybindings
 [mode.main.binding]
 
-# Launch terminal
-alt-enter = 'exec-and-forget open -n -a /Applications/kitty.app'
+# Launch terminal (uses default terminal — works with Terminal.app, Kitty, Ghostty, etc.)
+alt-enter = '''exec-and-forget osascript -e 'tell application "Terminal" to do script ""' '''
 
 # Scratchpad terminal (toggle floating terminal overlay)
 alt-s = 'exec-and-forget ~/.config/aerospace/scripts/scratchpad.sh'

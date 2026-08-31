@@ -61,7 +61,6 @@ restore_backup() {
 
 restore_backup "$HOME/.aerospace.toml"
 restore_backup "$HOME/.config/sketchybar"
-restore_backup "$HOME/.config/kitty"
 restore_backup "$HOME/.config/borders"
 restore_backup "$HOME/.config/aerospace"
 
@@ -76,7 +75,7 @@ echo ""
 echo -e "${GREEN}${BOLD}Spacesuit uninstalled.${NC}"
 echo ""
 echo -e "Brew packages were kept. To remove them:"
-echo -e "  ${BLUE}brew uninstall aerospace sketchybar borders kitty ice fzf choose-gui bash${NC}"
+echo -e "  ${BLUE}brew uninstall aerospace sketchybar borders fzf choose-gui bash${NC}"
 echo -e "  ${BLUE}brew uninstall --cask sf-symbols font-hack-nerd-font${NC}"
 echo ""
 echo -e "To remove Spacesuit source:"

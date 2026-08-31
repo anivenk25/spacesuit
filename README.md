@@ -11,7 +11,7 @@
 
 **Complete macOS tiling window manager setup in one command.**
 
-AeroSpace + Kitty + SketchyBar + JankyBorders | Catppuccin Mocha
+AeroSpace + SketchyBar + JankyBorders | Catppuccin Mocha
 
 [![macOS](https://img.shields.io/badge/macOS-13%2B-black?style=flat-square&logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![License](https://img.shields.io/badge/license-MIT-purple?style=flat-square)](LICENSE)
@@ -106,7 +106,7 @@ The installer will:
 | | Component | What it does |
 |---|---|---|
 | :window: | **[AeroSpace](https://github.com/nikitabobko/AeroSpace)** | i3-like tiling window manager for macOS |
-| :computer: | **[Kitty](https://sw.kovidgoyal.net/kitty/)** | GPU-accelerated terminal with proper native tabs |
+| :computer: | **Terminal.app** | Uses your default macOS terminal — no extra dependency |
 | :bar_chart: | **[SketchyBar](https://github.com/FelixKratz/SketchyBar)** | Highly customizable status bar at the bottom |
 | :art: | **[JankyBorders](https://github.com/FelixKratz/JankyBorders)** | Subtle colored borders around focused window |
 | :mag: | **[choose](https://github.com/chipsenkbeil/choose)** | Native macOS fuzzy picker for window search |
@@ -147,7 +147,7 @@ The installer will:
 
 | Keybind | Action |
 |:---|:---|
-| `alt` + `enter` | New Kitty terminal |
+| `alt` + `enter` | New terminal window |
 | `alt` + `space` | Search all windows + Chrome tabs + workspaces |
 | `alt` + `s` | Toggle scratchpad (floating terminal) |
 | `alt` + `o` then `1`-`5` | Launch top 5 most-used apps (adaptive) |
@@ -183,7 +183,7 @@ Select any result to instantly focus it — switches workspace and monitor autom
 
 ### Scratchpad Terminal
 
-`alt-s` toggles a floating Kitty terminal that follows you across workspaces. Use it for quick commands without disrupting your tiling layout.
+`alt-s` toggles a floating terminal that follows you across workspaces. Use it for quick commands without disrupting your tiling layout.
 
 ### State Persistence
 
@@ -240,8 +240,6 @@ Checks everything is healthy:
 [✓] aerospace installed
 [✓] sketchybar installed
 [✓] borders installed
-[✓] Kitty installed
-[✓] Hack Nerd Font installed
 [✓] All symlinks valid
 [✓] All services running
 [✓] AeroSpace has accessibility permission
@@ -257,7 +255,6 @@ All checks passed! Spacesuit is healthy.
 
 | Component | Details |
 |:---|:---|
-| **Kitty** | Full Mocha palette, powerline tab bar, purple active tabs |
 | **SketchyBar** | Mantle background, Mauve focused workspace, Teal occupied |
 | **Borders** | Subtle lavender active border at 75% opacity |
 | **Window gaps** | 10px inner, 10px outer (48px bottom for bar) |
@@ -290,7 +287,6 @@ Brew packages are kept — remove them individually if desired.
 ```
 ~/.aerospace.toml        → symlink → ~/.spacesuit/.aerospace.toml
 ~/.config/sketchybar/    → symlink → ~/.spacesuit/.config/sketchybar/
-~/.config/kitty/         → symlink → ~/.spacesuit/.config/kitty/
 ~/.config/borders/       → symlink → ~/.spacesuit/.config/borders/
 ~/.config/aerospace/     → symlink → ~/.spacesuit/.config/aerospace/
 ```
@@ -306,7 +302,6 @@ Built with love on top of these excellent projects:
 - [AeroSpace](https://github.com/nikitabobko/AeroSpace) by Nikita Bobko
 - [SketchyBar](https://github.com/FelixKratz/SketchyBar) by Felix Kratz
 - [JankyBorders](https://github.com/FelixKratz/JankyBorders) by Felix Kratz
-- [Kitty](https://sw.kovidgoyal.net/kitty/) by Kovid Goyal
 - [Catppuccin](https://github.com/catppuccin/catppuccin) theme
 
 ---
