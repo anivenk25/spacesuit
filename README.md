@@ -62,13 +62,37 @@ SketchyBar at the bottom shows all workspaces, window counts, app names, and you
 </tr>
 </table>
 
-> **Add your screenshots!** Take a screenshot of your setup and add it here:
-> ```
-> assets/desktop.png     — Full desktop with tiled windows
-> assets/bar.png         — Close-up of SketchyBar
-> assets/search.png      — Window search in action
-> assets/install.png     — Install output
-> ```
+---
+
+### Desktop — Main Monitor
+
+![Main display with tiled windows and SketchyBar](assets/desktop-main.png)
+
+### Desktop — Secondary Monitor
+
+![Secondary display](assets/desktop-secondary.png)
+
+### SketchyBar — Workspace Status
+
+![SketchyBar close-up showing workspace indicators](assets/sketchybar.png)
+
+> Purple = focused workspace | Blue = visible on other monitor | Teal = has windows | Dim = empty
+
+### Window Search (`alt-space`)
+
+![Fuzzy search across windows, Chrome tabs, and workspaces](assets/search.png)
+
+### Window Borders
+
+![Subtle Catppuccin borders around focused window](assets/borders.png)
+
+### `spacesuit doctor`
+
+![Spacesuit doctor output showing all checks passing](assets/doctor.png)
+
+### `spacesuit help`
+
+![Spacesuit CLI help with ASCII logo](assets/help.png)
 
 ---
 
