@@ -52,14 +52,11 @@ fi
 
 # ---- Section 3: Quick sites ----
 items="${items}--- Quick Sites ---
-url:https://jira.tools.sap/secure/Dashboard.jspa | Jira Dashboard
-url:https://github.tools.sap/I774364?tab=repositories | GitHub Repos
-url:https://open.spotify.com/ | Spotify
+url:https://github.com | GitHub
 url:https://mail.google.com | Gmail
 url:https://outlook.office.com | Outlook Web
 url:https://teams.microsoft.com | Teams Web
 url:https://chat.openai.com | ChatGPT
-url:https://github.com/anivenk25 | Personal GitHub
 "
 
 # ---- Section 4: Quick actions ----

@@ -155,10 +155,10 @@ alt-shift-l = ['join-with right', 'mode main']
 # Open mode - quick launcher (alt-o to enter, then press key)
 [mode.open.binding]
 esc = 'mode main'
-j = ['exec-and-forget open "https://jira.tools.sap/secure/Dashboard.jspa"', 'mode main']
-g = ['exec-and-forget open "https://github.tools.sap/I774364?tab=repositories"', 'mode main']
+j = ['exec-and-forget open "https://github.com"', 'mode main']
+g = ['exec-and-forget open "https://google.com"', 'mode main']
 n = ['exec-and-forget open -n -a TextEdit', 'mode main']
-s = ['exec-and-forget open "https://open.spotify.com/"', 'mode main']
+s = ['exec-and-forget open -a "Finder"', 'mode main']
 
 # Top 5 most used apps (adaptive — updates based on usage)
 1 = ['exec-and-forget ~/.config/aerospace/scripts/launch-top.sh 1', 'mode main']
