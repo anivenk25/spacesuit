@@ -1,0 +1,256 @@
+#!/bin/bash
+# Spacesuit CLI — macOS tiling WM setup
+# Usage: spacesuit [install|update|uninstall|status|doctor]
+
+set -euo pipefail
+
+# Resolve SPACESUIT_DIR — either set by formula or default to ~/.spacesuit
+SPACESUIT_DIR="${SPACESUIT_DIR:-$HOME/.spacesuit}"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+NC='\033[0m'
+BOLD='\033[1m'
+
+ok()   { echo -e "${GREEN}[✓]${NC} $1"; }
+fail() { echo -e "${RED}[✗]${NC} $1"; }
+warn() { echo -e "${YELLOW}[!]${NC} $1"; }
+
+# ============================================================================
+
+cmd_install() {
+  bash "$SPACESUIT_DIR/install.sh"
+}
+
+cmd_update() {
+  bash "$SPACESUIT_DIR/update.sh"
+}
+
+cmd_uninstall() {
+  bash "$SPACESUIT_DIR/uninstall.sh"
+}
+
+cmd_status() {
+  echo ""
+  echo -e "${PURPLE}${BOLD}Spacesuit Status${NC}"
+  echo ""
+
+  # Symlinks
+  echo -e "${BOLD}Symlinks:${NC}"
+  for target in "$HOME/.aerospace.toml" "$HOME/.config/sketchybar" "$HOME/.config/kitty" "$HOME/.config/borders" "$HOME/.config/aerospace"; do
+    if [ -L "$target" ]; then
+      ok "$target → $(readlink "$target")"
+    elif [ -e "$target" ]; then
+      warn "$target exists but is NOT a symlink"
+    else
+      fail "$target missing"
+    fi
+  done
+
+  echo ""
+  echo -e "${BOLD}Services:${NC}"
+  for svc in sketchybar borders; do
+    if brew services list 2>/dev/null | grep "$svc" | grep -q started; then
+      ok "$svc running"
+    else
+      fail "$svc not running"
+    fi
+  done
+
+  # AeroSpace
+  if pgrep -x "AeroSpace" &>/dev/null; then
+    ok "AeroSpace running"
+  else
+    fail "AeroSpace not running"
+  fi
+
+  # Ice
+  if pgrep -x "Ice" &>/dev/null; then
+    ok "Ice running"
+  else
+    warn "Ice not running"
+  fi
+
+  echo ""
+  echo -e "${BOLD}Workspaces:${NC}"
+  if command -v aerospace &>/dev/null && pgrep -x "AeroSpace" &>/dev/null; then
+    aerospace list-workspaces --all --format "%{workspace}" 2>/dev/null | while read -r ws; do
+      count=$(aerospace list-windows --workspace "$ws" --count 2>/dev/null || echo 0)
+      if [ "$count" -gt 0 ]; then
+        apps=$(aerospace list-windows --workspace "$ws" --format "%{app-name}" 2>/dev/null | sort -u | tr '\n' ', ' | sed 's/,$//')
+        echo -e "  ${BLUE}[$ws]${NC} $count windows: $apps"
+      fi
+    done
+  else
+    warn "AeroSpace not available"
+  fi
+  echo ""
+}
+
+cmd_doctor() {
+  echo ""
+  echo -e "${PURPLE}${BOLD}Spacesuit Doctor${NC}"
+  echo ""
+
+  ISSUES=0
+
+  # macOS version
+  MACOS_V=$(sw_vers -productVersion | cut -d. -f1)
+  if [ "$MACOS_V" -ge 13 ]; then
+    ok "macOS $(sw_vers -productVersion)"
+  else
+    fail "macOS 13+ required (have $(sw_vers -productVersion))"
+    ISSUES=$((ISSUES + 1))
+  fi
+
+  # Brew
+  if command -v brew &>/dev/null; then
+    ok "Homebrew installed"
+  else
+    fail "Homebrew not installed"
+    ISSUES=$((ISSUES + 1))
+  fi
+
+  # Dependencies
+  for dep in aerospace sketchybar borders bash fzf choose; do
+    if command -v "$dep" &>/dev/null || brew list "$dep" &>/dev/null 2>&1 || brew list --cask "$dep" &>/dev/null 2>&1; then
+      ok "$dep installed"
+    else
+      fail "$dep not installed"
+      ISSUES=$((ISSUES + 1))
+    fi
+  done
+
+  # Kitty
+  if [ -d "/Applications/kitty.app" ]; then
+    ok "Kitty installed"
+  else
+    fail "Kitty not installed"
+    ISSUES=$((ISSUES + 1))
+  fi
+
+  # Ice
+  if [ -d "/Applications/Ice.app" ]; then
+    ok "Ice installed"
+  else
+    warn "Ice not installed (optional)"
+  fi
+
+  # Fonts
+  if ls ~/Library/Fonts/HackNerdFont* &>/dev/null 2>&1; then
+    ok "Hack Nerd Font installed"
+  else
+    fail "Hack Nerd Font not installed"
+    ISSUES=$((ISSUES + 1))
+  fi
+
+  # Symlinks
+  for target in "$HOME/.aerospace.toml" "$HOME/.config/sketchybar" "$HOME/.config/kitty" "$HOME/.config/borders" "$HOME/.config/aerospace"; do
+    if [ -L "$target" ] && [ -e "$target" ]; then
+      ok "Symlink valid: $(basename "$target")"
+    elif [ -L "$target" ]; then
+      fail "Broken symlink: $target"
+      ISSUES=$((ISSUES + 1))
+    else
+      fail "Not symlinked: $target"
+      ISSUES=$((ISSUES + 1))
+    fi
+  done
+
+  # Services
+  for svc in sketchybar borders; do
+    if brew services list 2>/dev/null | grep "$svc" | grep -q started; then
+      ok "$svc service running"
+    else
+      fail "$svc service not running"
+      ISSUES=$((ISSUES + 1))
+    fi
+  done
+
+  # AeroSpace running
+  if pgrep -x "AeroSpace" &>/dev/null; then
+    ok "AeroSpace running"
+  else
+    fail "AeroSpace not running"
+    ISSUES=$((ISSUES + 1))
+  fi
+
+  # AeroSpace accessibility
+  # Can't check directly, but if aerospace commands work, it has permission
+  if aerospace list-monitors &>/dev/null 2>&1; then
+    ok "AeroSpace has accessibility permission"
+  else
+    fail "AeroSpace may lack accessibility permission"
+    ISSUES=$((ISSUES + 1))
+  fi
+
+  # bash 4+
+  BASH_V=$(/opt/homebrew/bin/bash --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.' | head -1 | tr -d '.')
+  if [ "${BASH_V:-0}" -ge 4 ]; then
+    ok "Bash 4+ installed (/opt/homebrew/bin/bash)"
+  else
+    fail "Bash 4+ not found at /opt/homebrew/bin/bash"
+    ISSUES=$((ISSUES + 1))
+  fi
+
+  # mru-spaces
+  if defaults read com.apple.dock mru-spaces 2>/dev/null | grep -q 0; then
+    ok "MRU spaces disabled"
+  else
+    warn "MRU spaces enabled (may cause workspace jumping)"
+  fi
+
+  echo ""
+  if [ "$ISSUES" -eq 0 ]; then
+    echo -e "${GREEN}${BOLD}All checks passed! Spacesuit is healthy.${NC}"
+  else
+    echo -e "${RED}${BOLD}$ISSUES issue(s) found. Run 'spacesuit install' to fix.${NC}"
+  fi
+  echo ""
+}
+
+cmd_help() {
+  echo ""
+  echo -e "${PURPLE}${BOLD}Spacesuit${NC} — macOS tiling WM setup"
+  echo ""
+  echo -e "  ${BOLD}Usage:${NC} spacesuit <command>"
+  echo ""
+  echo -e "  ${BOLD}Commands:${NC}"
+  echo -e "    ${BLUE}install${NC}     Install/reinstall everything (idempotent)"
+  echo -e "    ${BLUE}update${NC}      Pull latest configs + restart services"
+  echo -e "    ${BLUE}uninstall${NC}   Remove symlinks, restore backups"
+  echo -e "    ${BLUE}status${NC}      Show current state (symlinks, services, workspaces)"
+  echo -e "    ${BLUE}doctor${NC}      Check for issues"
+  echo -e "    ${BLUE}help${NC}        Show this message"
+  echo ""
+  echo -e "  ${BOLD}Components:${NC}"
+  echo -e "    AeroSpace    Tiling window manager"
+  echo -e "    SketchyBar   Workspace status bar"
+  echo -e "    Kitty        Terminal emulator"
+  echo -e "    Borders      Window border highlights"
+  echo -e "    Ice          Menu bar manager"
+  echo ""
+  echo -e "  ${BOLD}Source:${NC} https://github.com/anivenk25/dotfiles"
+  echo ""
+}
+
+# ============================================================================
+# Main
+# ============================================================================
+
+case "${1:-help}" in
+  install)   cmd_install ;;
+  update)    cmd_update ;;
+  uninstall) cmd_uninstall ;;
+  status)    cmd_status ;;
+  doctor)    cmd_doctor ;;
+  help|--help|-h) cmd_help ;;
+  *)
+    echo -e "${RED}Unknown command: $1${NC}"
+    cmd_help
+    exit 1
+    ;;
+esac
