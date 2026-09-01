@@ -2,6 +2,36 @@
 
 PLUGIN_DIR="$CONFIG_DIR/plugins"
 
+##### Resolve per-monitor SketchyBar display indices #####
+# AeroSpace %{monitor-appkit-nsscreen-screens-id} == SketchyBar display index.
+# We map the "main" workspaces (1-10) to the display holding aerospace 'main',
+# and "secondary" workspaces (A-F) to the display holding 'secondary'.
+MONITOR_COUNT=$(aerospace list-monitors 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "$MONITOR_COUNT" -le 1 ]; then
+  # Single monitor: put ALL 16 workspaces (1-10 + A-F) on the one display.
+  ONLY_DISPLAY=$(aerospace list-monitors --format '%{monitor-appkit-nsscreen-screens-id}' 2>/dev/null | head -1)
+  [ -z "$ONLY_DISPLAY" ] && ONLY_DISPLAY=1
+  MAIN_DISPLAY=$ONLY_DISPLAY
+  SEC_DISPLAY=$ONLY_DISPLAY
+else
+  MAIN_DISPLAY=""
+  SEC_DISPLAY=""
+  # For each monitor, look at its assigned workspaces. Numeric (1-10) => main,
+  # letter (A-F) => secondary. Map monitor's appkit id to the SketchyBar display.
+  while IFS='|' read -r mid appkit; do
+    [ -z "$mid" ] && continue
+    ws=$(aerospace list-workspaces --monitor "$mid" 2>/dev/null | tr -d ' ' | tr '\n' ' ')
+    case "$ws" in
+      *[0-9]*) MAIN_DISPLAY="$appkit" ;;
+      *[A-F]*) SEC_DISPLAY="$appkit" ;;
+    esac
+  done <<< "$(aerospace list-monitors --format '%{monitor-id}|%{monitor-appkit-nsscreen-screens-id}' 2>/dev/null)"
+  # Fallbacks if detection fails
+  [ -z "$MAIN_DISPLAY" ] && MAIN_DISPLAY=1
+  [ -z "$SEC_DISPLAY" ] && SEC_DISPLAY=2
+fi
+
 ##### Bar — Catppuccin Mocha (muted) #####
 sketchybar --bar \
   height=32 \
@@ -42,6 +72,7 @@ sketchybar --default \
 ##### Monitor label — main #####
 sketchybar --add item monitor_main left \
   --set monitor_main \
+    display=$MAIN_DISPLAY \
     icon="M" \
     icon.font="Hack Nerd Font:Bold:9.0" \
     icon.color=0xff6c7086 \
@@ -59,6 +90,7 @@ sketchybar --add event aerospace_workspace_change
 for sid in 1 2 3 4 5 6 7 8 9 10; do
   sketchybar --add item space.$sid left \
     --set space.$sid \
+      display=$MAIN_DISPLAY \
       icon="$sid" \
       icon.padding_left=10 \
       icon.padding_right=4 \
@@ -70,6 +102,7 @@ done
 ##### Separator #####
 sketchybar --add item sep1 left \
   --set sep1 \
+    display=$MAIN_DISPLAY \
     icon="│" \
     icon.font="Hack Nerd Font:Regular:14.0" \
     icon.color=0xff313244 \
@@ -81,6 +114,7 @@ sketchybar --add item sep1 left \
 ##### Monitor label — secondary #####
 sketchybar --add item monitor_sec left \
   --set monitor_sec \
+    display=$SEC_DISPLAY \
     icon="S" \
     icon.font="Hack Nerd Font:Bold:9.0" \
     icon.color=0xff6c7086 \
@@ -96,6 +130,7 @@ sketchybar --add item monitor_sec left \
 for sid in A B C D E F; do
   sketchybar --add item space.$sid left \
     --set space.$sid \
+      display=$SEC_DISPLAY \
       icon="$sid" \
       icon.padding_left=10 \
       icon.padding_right=4 \
@@ -107,6 +142,7 @@ done
 ##### Separator #####
 sketchybar --add item sep2 left \
   --set sep2 \
+    display=$SEC_DISPLAY \
     icon="│" \
     icon.font="Hack Nerd Font:Regular:14.0" \
     icon.color=0xff313244 \
@@ -132,25 +168,7 @@ sketchybar --add item front_app left \
     script="$PLUGIN_DIR/front_app.sh" \
   --subscribe front_app front_app_switched
 
-##### Focused Window Title (right side — rightmost) #####
-sketchybar --add item window_title right \
-  --set window_title \
-    icon="" \
-    icon.font="Hack Nerd Font:Bold:10.0" \
-    icon.color=0xff585b70 \
-    icon.padding_left=8 \
-    icon.padding_right=4 \
-    label.drawing=on \
-    label.font="Hack Nerd Font:Regular:10.0" \
-    label.color=0xff6c7086 \
-    label.padding_right=10 \
-    label.max_chars=60 \
-    background.color=0xff181825 \
-    background.border_width=0 \
-    script="$PLUGIN_DIR/window_title.sh" \
-    update_freq=2
-
-##### Top 5 Apps (right side, before window title) #####
+##### Top 5 Apps (right side) #####
 sketchybar --add item top_label right \
   --set top_label \
     icon="alt-o" \
@@ -194,6 +212,15 @@ sketchybar --add item ws_trigger left \
     drawing=off \
     script="$PLUGIN_DIR/update-all-workspaces.sh" \
   --subscribe ws_trigger aerospace_workspace_change
+
+##### Re-target pills when monitors are plugged/unplugged #####
+# On display change, re-run this config so per-monitor display= masks are
+# recomputed (e.g. A-F move to the reconnected secondary display).
+sketchybar --add item display_watcher left \
+  --set display_watcher \
+    drawing=off \
+    script="$PLUGIN_DIR/on-display-change.sh" \
+  --subscribe display_watcher display_change
 
 ##### Force refresh #####
 sketchybar --update
