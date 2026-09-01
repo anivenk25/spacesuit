@@ -218,7 +218,10 @@ build_strip() {
   local ok=1
   local inputs=()
   if [ -n "$numtmp" ] && [ -s "$numtmp" ]; then
-    inputs=( "$numtmp" -background none -splice "${NUM_GAP}x0" "${pngs[@]}" )
+    # Create a transparent spacer image for the gap between number and icons
+    local gaptmp="$strip.gap.$$.png"
+    magick -size "${NUM_GAP}x${ICON_PX}" xc:none "png:$gaptmp" >/dev/null 2>&1
+    inputs=( "$numtmp" "$gaptmp" "${pngs[@]}" )
   else
     inputs=( "${pngs[@]}" )
   fi
@@ -229,7 +232,7 @@ build_strip() {
     -gravity west -splice "${edge}x0" \
     -gravity east -splice "${edge}x0" +repage \
     "png:$tmp" >/dev/null 2>&1 || ok=0
-  rm -f "$numtmp" 2>/dev/null
+  rm -f "$numtmp" "$strip.gap.$$.png" 2>/dev/null
 
   if [ "$ok" -eq 1 ] && [ -s "$tmp" ]; then
     mv -f "$tmp" "$strip" 2>/dev/null || { rm -f "$tmp"; printf ''; return; }

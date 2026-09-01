@@ -184,49 +184,6 @@ sketchybar --add item front_app left \
     script="$PLUGIN_DIR/front_app.sh" \
   --subscribe front_app front_app_switched
 
-##### Top 5 Apps (right side) #####
-sketchybar --add item top_label right \
-  --set top_label \
-    icon="󰀻" \
-    icon.font="Hack Nerd Font:Bold:13.0" \
-    icon.color=0xfff9e2af \
-    icon.padding_left=11 \
-    icon.padding_right=11 \
-    padding_left=2 \
-    padding_right=6 \
-    label.drawing=off \
-    background.color=0x33f9e2af \
-    background.border_width=0 \
-    background.height=28 \
-    background.corner_radius=9
-
-for idx in 1 2 3 4 5; do
-  sketchybar --add item top_app.$idx right \
-    --set top_app.$idx \
-      icon="" \
-      icon.font="Hack Nerd Font:Bold:12.0" \
-      icon.color=0xffcba6f7 \
-      icon.padding_left=9 \
-      icon.padding_right=4 \
-      padding_left=3 \
-      padding_right=3 \
-      label="" \
-      label.drawing=on \
-      label.font="Hack Nerd Font:Regular:11.0" \
-      label.color=0xffbac2de \
-      label.padding_left=0 \
-      label.padding_right=9 \
-      background.color=0x40313244 \
-      background.corner_radius=9 \
-      background.height=28 \
-      background.border_width=0 \
-      click_script="~/.config/aerospace/scripts/launch-top.sh $idx" \
-      drawing=off
-done
-
-# Initial top 5 update
-exec ~/.config/aerospace/scripts/update-top5.sh &
-
 ##### Workspace update trigger (single script updates all 16 items) #####
 # Subscribe to multiple events for snappy response when switching apps/spaces.
 sketchybar --add item ws_trigger left \
