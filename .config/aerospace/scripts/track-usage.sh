@@ -20,8 +20,11 @@ FOCUSED_TITLE=$(aerospace list-windows --focused --format "%{window-title}" 2>/d
 echo "${TIMESTAMP}	${FOCUSED_WS}	${FOCUSED_APP}	${FOCUSED_TITLE}" >> "$USAGE_FILE"
 tail -5000 "$USAGE_FILE" > "$USAGE_FILE.tmp" && mv "$USAGE_FILE.tmp" "$USAGE_FILE"
 
-# Rebuild frequency table (app frequencies)
-awk -F'\t' '{print $3}' "$USAGE_FILE" | sort | uniq -c | sort -rn | awk '{print $1"\t"$2}' > "$FREQ_FILE"
+# Rebuild frequency table (app frequencies). Preserve full app names (which
+# contain spaces, e.g. "Google Chrome"): strip only the leading uniq -c count,
+# then emit "<count>\t<app name>".
+awk -F'\t' '$3 != "" {print $3}' "$USAGE_FILE" | sort | uniq -c | sort -rn \
+  | sed -E 's/^ *([0-9]+) (.*)$/\1\t\2/' > "$FREQ_FILE"
 
 # Also track time-of-day patterns (hour → app)
 HOUR=$(date +%H)

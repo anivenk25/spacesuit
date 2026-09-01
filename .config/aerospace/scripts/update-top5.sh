@@ -5,6 +5,11 @@ USAGE_DIR="$HOME/.config/aerospace/usage"
 FREQ_FILE="$USAGE_DIR/frequencies.tsv"
 BIND_FILE="$USAGE_DIR/top5.sh"
 
+# Real app icons for the alt-o pills (same pipeline as workspace pills).
+ICON_HELPERS="$HOME/.config/sketchybar/plugins/icon-helpers.sh"
+# shellcheck source=/dev/null
+[ -f "$ICON_HELPERS" ] && source "$ICON_HELPERS"
+
 [ ! -f "$FREQ_FILE" ] && exit 0
 
 # Read top 5 apps
@@ -58,17 +63,46 @@ for j in $(seq 0 4); do
       "Google Chrome") short="Chrome" ;;
       "Microsoft Outlook") short="Mail" ;;
       "Microsoft Teams") short="Teams" ;;
+      "Microsoft Excel") short="Excel" ;;
+      "Microsoft Word") short="Word" ;;
+      "Microsoft PowerPoint") short="PPT" ;;
       "Visual Studio Code") short="VSCode" ;;
       "Joule Desktop") short="Joule" ;;
     esac
 
-    sketchybar --set top_app.$idx \
-      icon="${TOP_ICONS[$j]}" \
-      icon.color=0xffcba6f7 \
-      label="$idx:$short" \
-      label.drawing=on \
-      label.color=0xffa6adc8 \
-      drawing=on 2>/dev/null
+    # Bake [index][icon][name] into ONE strip so spacing is uniform (no image
+    # vs. label reservation conflict). Pin item width to the displayed size
+    # (strip_px/2 + pad) so SketchyBar reserves exactly what it draws.
+    strip=""; strip_px=0
+    if type build_top_strip >/dev/null 2>&1; then
+      out="$(build_top_strip "$idx" "${TOP_APPS[$j]}")"
+      strip="${out%%|*}"; strip_px="${out##*|}"
+      [[ "$strip_px" =~ ^[0-9]+$ ]] || strip_px=0
+    fi
+
+    if [ -n "$strip" ] && [ -f "$strip" ] && [ "$strip_px" -gt 0 ]; then
+      pill_w=$(( strip_px / 2 + 12 ))
+      sketchybar --set top_app.$idx \
+        icon.drawing=off icon="" \
+        label.drawing=off label="" \
+        padding_left="${SPACESUIT_PILL_GAP:-6}" \
+        padding_right="${SPACESUIT_PILL_GAP:-6}" \
+        background.image="$strip" \
+        background.image.drawing=on \
+        background.image.scale=0.5 \
+        width=$pill_w \
+        drawing=on 2>/dev/null
+    else
+      # Fallback: no icon resolved — index + name text only.
+      sketchybar --set top_app.$idx \
+        background.image.drawing=off \
+        icon.drawing=on icon="$idx:" icon.color=0xffcba6f7 \
+        label="$short" \
+        label.drawing=on \
+        label.color=0xffa6adc8 \
+        width=0 \
+        drawing=on 2>/dev/null
+    fi
   else
     sketchybar --set top_app.$idx drawing=off 2>/dev/null
   fi
