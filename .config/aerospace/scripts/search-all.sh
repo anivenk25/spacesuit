@@ -17,6 +17,48 @@ mkdir -p "$TMPDIR_SEARCH"
 CHROME_CACHE="$TMPDIR_SEARCH/chrome.cache"
 CHROME_TTL=3   # seconds
 
+# ---- Relevance ranking (frecency) ----
+# Every pick is logged to search_history.tsv; results are ordered so items you
+# choose often/recently float to the top. `choose` keeps input order for equal
+# fuzzy matches, so your favourites lead when the query is empty/weak, while
+# fuzzy typing still narrows normally.
+USAGE_DIR="$HOME/.config/aerospace/usage"
+SEARCH_HISTORY="$USAGE_DIR/search_history.tsv"
+mkdir -p "$USAGE_DIR"
+
+# A stable ranking key per item (window ids/tab ids churn between runs, so rank
+# windows by app name and tabs by URL — both stable identifiers).
+#   win -> "win:<app>"      tab -> "tab:<url>"      ws -> "ws:<name>"
+declare -A FRECENCY
+if [ -f "$SEARCH_HISTORY" ]; then
+  # Frecency = sum over picks of 0.5^(age_days / HALFLIFE). Recent+frequent wins.
+  # One awk pass over the (bounded) history file — a few ms.
+  while IFS=$'\t' read -r rk score; do
+    [ -n "$rk" ] && FRECENCY[$rk]="$score"
+  done < <(awk -F'\t' -v now="$(date +%s)" '
+    NF>=2 {
+      ts=$1; key=$2
+      for (i=3;i<=NF;i++) key=key FS $i        # keep any tabs in the key intact
+      age=(now-ts)/86400.0                      # age in days
+      if (age<0) age=0
+      w=exp(-0.693147*age/14.0)                 # 14-day half-life
+      s[key]+=w
+    }
+    END { for (k in s) printf "%s\t%.6f\n", k, s[k] }
+  ' "$SEARCH_HISTORY" 2>/dev/null)
+fi
+
+# Append a scored item line "<score>\t<prefix> | <label>\n" to the global
+# $scored buffer WITHOUT forking a subshell (printf -v). Score drives the sort
+# and is stripped before the picker sees it; top-scored items get a ★ marker.
+scored=""
+emit() {
+  local rankkey="$1" prefix="$2" label="$3"
+  local sc="${FRECENCY[$rankkey]:-0}" _line
+  printf -v _line '%s\t%s | %s\n' "$sc" "$prefix" "$label"
+  scored+="$_line"
+}
+
 # Leaner Chrome enumeration. Fields separated by the unambiguous token DELIM.
 # Output lines: winId DELIM tabIdx DELIM activeIdx DELIM title DELIM url
 CHROME_DELIM=$'\x1f'   # ASCII unit separator — never appears in titles/URLs
@@ -64,7 +106,8 @@ if ! cache_fresh; then
   refresh_chrome_cache
 fi
 
-items=""
+# $scored collects "score\tprefix | label" lines (populated by emit); sorted
+# before display. Initialized above where emit() is defined.
 
 # 1. AeroSpace windows (no forks — pure parameter expansion)
 while IFS='|' read -r wid ws app title; do
@@ -76,8 +119,7 @@ while IFS='|' read -r wid ws app title; do
   title="${title#"${title%%[![:space:]]*}"}"; title="${title%"${title##*[![:space:]]}"}"
   marker=""
   [ "$ws" = "$FOCUSED_WS" ] && marker="*"
-  items="${items}win:${wid} | [${ws}${marker}] ${app} - ${title}
-"
+  emit "win:${app}" "win:${wid}" "[${ws}${marker}] ${app} - ${title}"
 done <<< "$ALL_WINDOWS"
 
 # 2. Workspaces — derive counts/apps from the window data already fetched (no forks)
@@ -98,11 +140,9 @@ ALL_WS="${SPACESUIT_WORKSPACES:-1 2 3 4 5 6 7 8 9 10 A B C D E F}"
 for ws in $ALL_WS; do
   count=${WS_COUNTS[$ws]:-0}
   if [ "$count" -gt 0 ]; then
-    items="${items}ws:${ws} | Workspace ${ws} (${count} windows: ${WS_APPS[$ws]})
-"
+    emit "ws:${ws}" "ws:${ws}" "Workspace ${ws} (${count} windows: ${WS_APPS[$ws]})"
   else
-    items="${items}ws:${ws} | Workspace ${ws} (empty)
-"
+    emit "ws:${ws}" "ws:${ws}" "Workspace ${ws} (empty)"
   fi
 done
 
@@ -115,13 +155,23 @@ if [ -f "$CHROME_CACHE" ]; then
     tidx="${tidx// /}"
     ttitle="${ttitle#"${ttitle%%[![:space:]]*}"}"; ttitle="${ttitle%"${ttitle##*[![:space:]]}"}"
     turl="${turl#"${turl%%[![:space:]]*}"}"; turl="${turl%"${turl##*[![:space:]]}"}"
-    items="${items}tab:${cwid}:${tidx} | Chrome - ${ttitle}  —  ${turl}
-"
+    emit "tab:${turl}" "tab:${cwid}:${tidx}" "Chrome - ${ttitle}  —  ${turl}"
   done < "$CHROME_CACHE"
 fi
 
-# ---- Show picker ----
-selected=$(printf '%s' "$items" | grep -v '^$' | choose)
+# ---- Rank + show picker ----
+# Sort by frecency score (desc), stable so equal-score items keep insertion
+# order (windows, then workspaces, then tabs). Mark items with any history (★),
+# then strip the leading "score\t" column before the picker sees it.
+items=$(printf '%s' "$scored" | grep -v '^[[:space:]]*$' \
+  | sort -t$'\t' -k1,1 -rns \
+  | awk -F'\t' '{
+      score=$1; sub(/^[^\t]*\t/, "")   # strip leading score column
+      if (score+0 > 0) sub(/ \| /, " | ★ ")
+      print
+    }')
+
+selected=$(printf '%s\n' "$items" | grep -v '^$' | choose)
 [ -z "$selected" ] && exit 0
 
 # ---- Act on selection ----
@@ -130,15 +180,37 @@ prefix="${selected%%|*}"
 prefix="${prefix#"${prefix%%[![:space:]]*}"}"; prefix="${prefix%"${prefix##*[![:space:]]}"}"
 type="${prefix%%:*}"
 
+# Record the pick for frecency ranking. rank_key mirrors emit():
+#   win -> win:<app>   tab -> tab:<url>   ws -> ws:<name>
+# Derived from the selected LABEL (stable across runs), not the volatile ids.
+log_pick() {
+  local rk="$1"
+  [ -z "$rk" ] && return
+  printf '%s\t%s\n' "$(date +%s)" "$rk" >> "$SEARCH_HISTORY"
+  # Keep history bounded (last 5000 picks).
+  tail -5000 "$SEARCH_HISTORY" > "$SEARCH_HISTORY.tmp" 2>/dev/null \
+    && mv -f "$SEARCH_HISTORY.tmp" "$SEARCH_HISTORY" 2>/dev/null
+}
+
+# label = text after first "| ", with any leading "★ " marker stripped.
+label="${selected#*| }"
+label="${label#★ }"
+
 case "$type" in
   win)
     wid="${prefix#win:}"
+    # rank key = app name = label between the "] " and " - ".
+    _lbl="${label#*] }"; app_name="${_lbl%% - *}"
+    log_pick "win:${app_name}"
     aerospace focus --window-id "$wid" 2>/dev/null
     ;;
   tab)
     rest="${prefix#tab:}"
     chrome_wid="${rest%%:*}"
     tab_idx="${rest##*:}"
+    # rank key = URL = text after the last "  —  " separator.
+    tab_url="${label##*  —  }"
+    log_pick "tab:${tab_url}"
     # Focus the Chrome window in AeroSpace if we can find it (match by app), then
     # activate the exact tab. Window focus is best-effort; tab activation is exact.
     aero_wid=$(printf '%s\n' "$ALL_WINDOWS" | grep -i '|Google Chrome|' | head -1 | cut -d'|' -f1)
@@ -159,6 +231,7 @@ case "$type" in
     ;;
   ws)
     ws_name="${prefix#ws:}"
+    log_pick "ws:${ws_name}"
     aerospace workspace "$ws_name" 2>/dev/null
     ;;
 esac
