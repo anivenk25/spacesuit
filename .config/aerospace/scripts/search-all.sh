@@ -211,23 +211,80 @@ case "$type" in
     # rank key = URL = text after the last "  —  " separator.
     tab_url="${label##*  —  }"
     log_pick "tab:${tab_url}"
-    # Focus the Chrome window in AeroSpace if we can find it (match by app), then
-    # activate the exact tab. Window focus is best-effort; tab activation is exact.
-    aero_wid=$(printf '%s\n' "$ALL_WINDOWS" | grep -i '|Google Chrome|' | head -1 | cut -d'|' -f1)
-    aero_wid="${aero_wid// /}"
-    [ -n "$aero_wid" ] && aerospace focus --window-id "$aero_wid" 2>/dev/null
-    # Activate the exact tab AND raise its window to the front.
-    osascript -e "tell application \"Google Chrome\"
-      set idx to 0
+    # Activate by URL (stable), NOT the cached index (which goes stale when tabs
+    # are opened/closed/reordered). Strategy:
+    #   1) Prefer the originally-cached window id; find the tab whose URL matches.
+    #   2) If not found there, search ALL Chrome windows for the URL.
+    #   3) Fall back to the cached index in the cached window only if URL fails.
+    # Returns the resolved Chrome window id so we focus the CORRECT AeroSpace win.
+    esc_url="${tab_url//\\/\\\\}"; esc_url="${esc_url//\"/\\\"}"
+    resolved_title=$(osascript -e "tell application \"Google Chrome\"
+      set targetURL to \"$esc_url\"
+      set foundWin to missing value
+      set foundTab to 0
+      -- Pass 1: the cached window, matched by URL
       repeat with wi from 1 to (count of windows)
-        if (id of window wi as text) is \"$chrome_wid\" then set idx to wi
+        if (id of window wi as text) is \"$chrome_wid\" then
+          set tabs_u to URL of tabs of window wi
+          repeat with ti from 1 to (count of tabs_u)
+            if (item ti of tabs_u) is targetURL then
+              set foundWin to wi
+              set foundTab to ti
+              exit repeat
+            end if
+          end repeat
+        end if
       end repeat
-      if idx > 0 then
-        set active tab index of window idx to $tab_idx
-        set index of window idx to 1
+      -- Pass 2: any window, matched by URL
+      if foundWin is missing value then
+        repeat with wi from 1 to (count of windows)
+          set tabs_u to URL of tabs of window wi
+          repeat with ti from 1 to (count of tabs_u)
+            if (item ti of tabs_u) is targetURL then
+              set foundWin to wi
+              set foundTab to ti
+              exit repeat
+            end if
+          end repeat
+          if foundWin is not missing value then exit repeat
+        end repeat
       end if
-      activate
-    end tell" 2>/dev/null
+      -- Pass 3: fall back to cached index in the cached window
+      if foundWin is missing value then
+        repeat with wi from 1 to (count of windows)
+          if (id of window wi as text) is \"$chrome_wid\" then
+            set foundWin to wi
+            set foundTab to $tab_idx
+          end if
+        end repeat
+      end if
+      if foundWin is not missing value then
+        set active tab index of window foundWin to foundTab
+        set index of window foundWin to 1
+        activate
+        return (title of active tab of window foundWin)
+      end if
+      return \"\"
+    end tell" 2>/dev/null)
+    # Focus the CORRECT AeroSpace Chrome window. AeroSpace's window-id differs from
+    # Chrome's, but the AeroSpace window title tracks the active tab's title. We
+    # just made the target tab active, so RE-QUERY AeroSpace (fresh titles) and
+    # match the Chrome window whose title contains the resolved tab title.
+    aero_wid=""
+    if [ -n "$resolved_title" ]; then
+      FRESH_WINDOWS=$(aerospace list-windows --all --format "%{window-id}|%{app-name}|%{window-title}" 2>/dev/null)
+      while IFS='|' read -r awid aapp atitle; do
+        [ "$aapp" = "Google Chrome" ] || continue
+        if [[ "$atitle" == *"$resolved_title"* ]]; then
+          aero_wid="${awid// /}"; break
+        fi
+      done <<< "$FRESH_WINDOWS"
+    fi
+    if [ -z "$aero_wid" ]; then
+      aero_wid=$(printf '%s\n' "$ALL_WINDOWS" | grep -i '|Google Chrome|' | head -1 | cut -d'|' -f1)
+      aero_wid="${aero_wid// /}"
+    fi
+    [ -n "$aero_wid" ] && aerospace focus --window-id "$aero_wid" 2>/dev/null
     ;;
   ws)
     ws_name="${prefix#ws:}"
