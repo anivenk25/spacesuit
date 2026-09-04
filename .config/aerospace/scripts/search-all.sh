@@ -1,62 +1,101 @@
 #!/opt/homebrew/bin/bash
-# search-all.sh — fast unified search: windows, chrome tabs, workspaces
+# search-all.sh — fast unified search: windows, Chrome tabs (title+URL), workspaces
+#
+# Speed design:
+#   - AeroSpace windows + workspaces are gathered in ~60ms and shown IMMEDIATELY.
+#   - Chrome tabs are read from a short-lived cache (instant) and refreshed in the
+#     background, so the picker never blocks on Chrome's ~0.7s AppleScript.
+#   - Leaner single-pass AppleScript: batch-fetches `title of tabs`/`URL of tabs`
+#     and emits windowId + tabIndex directly (no O(win*tab) title-matching loop).
+#   - Zero subshell forks in the build loops (bash parameter expansion only).
+#   - URL is part of each tab's searchable text (type a domain to match a tab).
+
+set -o pipefail
 
 TMPDIR_SEARCH="/tmp/aerospace-search"
 mkdir -p "$TMPDIR_SEARCH"
+CHROME_CACHE="$TMPDIR_SEARCH/chrome.cache"
+CHROME_TTL=3   # seconds
 
-# ---- Parallel data collection ----
-
-# AeroSpace windows (instant)
-ALL_WINDOWS=$(aerospace list-windows --all --format "%{window-id}|%{workspace}|%{app-name}|%{window-title}" 2>/dev/null)
-FOCUSED_WS=$(aerospace list-workspaces --focused 2>/dev/null)
-
-# Chrome tabs + mapping in ONE AppleScript call (was 2 calls = 3.5s, now 1 call)
-CHROME_DATA=$(osascript -e '
+# Leaner Chrome enumeration. Fields separated by the unambiguous token DELIM.
+# Output lines: winId DELIM tabIdx DELIM activeIdx DELIM title DELIM url
+CHROME_DELIM=$'\x1f'   # ASCII unit separator — never appears in titles/URLs
+CHROME_QUERY='
+set d to (ASCII character 31)
+set out to ""
 tell application "Google Chrome"
-  set output to ""
-  repeat with w in windows
+  repeat with wi from 1 to (count of windows)
+    set w to window wi
     set wid to id of w
-    set activeTitle to title of active tab of w
-    set tabCount to count of tabs of w
-    repeat with i from 1 to tabCount
-      set t to tab i of w
-      set output to output & wid & ":" & i & ":" & activeTitle & "|" & title of t & linefeed
+    set ai to active tab index of w
+    set tt to title of tabs of w
+    set uu to URL of tabs of w
+    repeat with i from 1 to (count of tt)
+      set out to out & wid & d & i & d & ai & d & (item i of tt) & d & (item i of uu) & linefeed
     end repeat
   end repeat
-  return output
-end tell' 2>/dev/null) &
-CHROME_PID=$!
+end tell
+return out'
 
-# ---- Build items while Chrome query runs ----
+# Refresh the Chrome cache in the background (atomic write via temp + mv).
+refresh_chrome_cache() {
+  # Fully detached (own session, no controlling shell) so we NEVER wait on it.
+  ( osascript -e "$CHROME_QUERY" 2>/dev/null > "$CHROME_CACHE.tmp.$$" \
+      && mv -f "$CHROME_CACHE.tmp.$$" "$CHROME_CACHE" \
+      || rm -f "$CHROME_CACHE.tmp.$$" ) </dev/null >/dev/null 2>&1 &
+  disown 2>/dev/null || true
+}
+
+# Is the cache fresh (exists and younger than TTL)?
+cache_fresh() {
+  [ -f "$CHROME_CACHE" ] || return 1
+  local age
+  age=$(( $(date +%s) - $(stat -f %m "$CHROME_CACHE" 2>/dev/null || echo 0) ))
+  [ "$age" -lt "$CHROME_TTL" ]
+}
+
+# ---- Instant data: AeroSpace windows + workspaces (~60ms) ----
+ALL_WINDOWS=$(aerospace list-windows --all --format "%{window-id}|%{workspace}|%{app-name}|%{window-title}" 2>/dev/null)
+FOCUSED_WS=$(aerospace list-workspaces --focused 2>/dev/null | head -1)
+FOCUSED_WS="${FOCUSED_WS// /}"
+
+# Kick off Chrome refresh now if stale; use existing cache meanwhile.
+if ! cache_fresh; then
+  refresh_chrome_cache
+fi
 
 items=""
 
-# 1. AeroSpace windows
+# 1. AeroSpace windows (no forks — pure parameter expansion)
 while IFS='|' read -r wid ws app title; do
   [ -z "$wid" ] && continue
-  wid=$(echo "$wid" | tr -d ' ')
-  ws=$(echo "$ws" | tr -d ' ')
-  app=$(echo "$app" | sed 's/^ *//;s/ *$//')
-  title=$(echo "$title" | sed 's/^ *//;s/ *$//')
+  wid="${wid// /}"
+  ws="${ws// /}"
+  # trim leading/trailing spaces from app/title
+  app="${app#"${app%%[![:space:]]*}"}"; app="${app%"${app##*[![:space:]]}"}"
+  title="${title#"${title%%[![:space:]]*}"}"; title="${title%"${title##*[![:space:]]}"}"
   marker=""
   [ "$ws" = "$FOCUSED_WS" ] && marker="*"
   items="${items}win:${wid} | [${ws}${marker}] ${app} - ${title}
 "
 done <<< "$ALL_WINDOWS"
 
-# 2. Workspaces — build from already-fetched window data (no extra calls)
+# 2. Workspaces — derive counts/apps from the window data already fetched (no forks)
 declare -A WS_COUNTS WS_APPS
 while IFS='|' read -r wid ws app title; do
   [ -z "$ws" ] && continue
-  ws=$(echo "$ws" | tr -d ' ')
-  app=$(echo "$app" | sed 's/^ *//;s/ *$//')
+  ws="${ws// /}"
+  app="${app#"${app%%[![:space:]]*}"}"; app="${app%"${app##*[![:space:]]}"}"
   WS_COUNTS[$ws]=$(( ${WS_COUNTS[$ws]:-0} + 1 ))
-  if [ -n "$app" ] && [[ "${WS_APPS[$ws]}" != *"$app"* ]]; then
+  if [ -n "$app" ] && [[ " ${WS_APPS[$ws]} " != *" $app "* ]]; then
     WS_APPS[$ws]="${WS_APPS[$ws]:+${WS_APPS[$ws]}, }$app"
   fi
 done <<< "$ALL_WINDOWS"
 
-for ws in $(aerospace list-workspaces --all 2>/dev/null); do
+# Persistent workspace set (from ~/.aerospace.toml). Avoids a ~0.45s
+# `list-workspaces --all` call on the hot path; override via SPACESUIT_WORKSPACES.
+ALL_WS="${SPACESUIT_WORKSPACES:-1 2 3 4 5 6 7 8 9 10 A B C D E F}"
+for ws in $ALL_WS; do
   count=${WS_COUNTS[$ws]:-0}
   if [ "$count" -gt 0 ]; then
     items="${items}ws:${ws} | Workspace ${ws} (${count} windows: ${WS_APPS[$ws]})
@@ -67,79 +106,59 @@ for ws in $(aerospace list-workspaces --all 2>/dev/null); do
   fi
 done
 
-# ---- Wait for Chrome data ----
-wait $CHROME_PID 2>/dev/null
-
-# Build Chrome window → AeroSpace window map
-CHROME_WINDOWS=$(echo "$ALL_WINDOWS" | grep -i chrome)
-declare -A CHROME_MAP
-
-while IFS='|' read -r chrome_ref tab_title; do
-  [ -z "$chrome_ref" ] && continue
-  chrome_wid=$(echo "$chrome_ref" | cut -d: -f1)
-  active_title=$(echo "$chrome_ref" | cut -d: -f3-)
-  
-  # Map Chrome window to AeroSpace window (only once per Chrome window)
-  if [ -z "${CHROME_MAP[$chrome_wid]}" ]; then
-    while IFS='|' read -r awid aws aapp atitle; do
-      awid=$(echo "$awid" | tr -d ' ')
-      aws=$(echo "$aws" | tr -d ' ')
-      if echo "$atitle" | grep -qF "$active_title"; then
-        CHROME_MAP[$chrome_wid]="$awid|$aws"
-        break
-      fi
-    done <<< "$CHROME_WINDOWS"
-  fi
-
-  tab_idx=$(echo "$chrome_ref" | cut -d: -f2)
-  tab_title=$(echo "$tab_title" | sed 's/^ *//;s/ *$//')
-  
-  mapped="${CHROME_MAP[$chrome_wid]}"
-  aero_wid=$(echo "$mapped" | cut -d'|' -f1)
-  ws=$(echo "$mapped" | cut -d'|' -f2)
-  ws_marker=""
-  [ "$ws" = "$FOCUSED_WS" ] && ws_marker="*"
-  
-  if [ -n "$aero_wid" ]; then
-    items="${items}tab:${chrome_wid}:${tab_idx}:${aero_wid} | [${ws}${ws_marker}] Chrome Tab - ${tab_title}
+# 3. Chrome tabs from cache (instant). Each line carries winId+tabIdx directly, so
+#    activation needs no re-scan. URL is appended (searchable + visible, secondary).
+if [ -f "$CHROME_CACHE" ]; then
+  while IFS="$CHROME_DELIM" read -r cwid tidx aidx ttitle turl; do
+    [ -z "$cwid" ] && continue
+    cwid="${cwid// /}"
+    tidx="${tidx// /}"
+    ttitle="${ttitle#"${ttitle%%[![:space:]]*}"}"; ttitle="${ttitle%"${ttitle##*[![:space:]]}"}"
+    turl="${turl#"${turl%%[![:space:]]*}"}"; turl="${turl%"${turl##*[![:space:]]}"}"
+    items="${items}tab:${cwid}:${tidx} | Chrome - ${ttitle}  —  ${turl}
 "
-  else
-    items="${items}tab:${chrome_wid}:${tab_idx}: | Chrome Tab - ${tab_title}
-"
-  fi
-done <<< "$CHROME_DATA"
+  done < "$CHROME_CACHE"
+fi
 
 # ---- Show picker ----
-selected=$(echo "$items" | grep -v '^$' | choose)
+selected=$(printf '%s' "$items" | grep -v '^$' | choose)
 [ -z "$selected" ] && exit 0
 
 # ---- Act on selection ----
-prefix=$(echo "$selected" | awk -F'|' '{gsub(/^[ \t]+|[ \t]+$/, "", $1); print $1}')
-type=$(echo "$prefix" | cut -d: -f1)
+# prefix = text before first '|', trimmed.
+prefix="${selected%%|*}"
+prefix="${prefix#"${prefix%%[![:space:]]*}"}"; prefix="${prefix%"${prefix##*[![:space:]]}"}"
+type="${prefix%%:*}"
 
 case "$type" in
   win)
-    wid=$(echo "$prefix" | cut -d: -f2)
+    wid="${prefix#win:}"
     aerospace focus --window-id "$wid" 2>/dev/null
     ;;
   tab)
-    chrome_wid=$(echo "$prefix" | cut -d: -f2)
-    tab_idx=$(echo "$prefix" | cut -d: -f3)
-    aero_wid=$(echo "$prefix" | cut -d: -f4)
-    if [ -n "$aero_wid" ]; then
-      aerospace focus --window-id "$aero_wid" 2>/dev/null
-    fi
-    osascript -e "
-      tell application \"Google Chrome\"
-        repeat with w in windows
-          if id of w is $chrome_wid then
-            set active tab index of w to $tab_idx
-          end if
-        end repeat
-      end tell" 2>/dev/null
+    rest="${prefix#tab:}"
+    chrome_wid="${rest%%:*}"
+    tab_idx="${rest##*:}"
+    # Focus the Chrome window in AeroSpace if we can find it (match by app), then
+    # activate the exact tab. Window focus is best-effort; tab activation is exact.
+    aero_wid=$(printf '%s\n' "$ALL_WINDOWS" | grep -i '|Google Chrome|' | head -1 | cut -d'|' -f1)
+    aero_wid="${aero_wid// /}"
+    [ -n "$aero_wid" ] && aerospace focus --window-id "$aero_wid" 2>/dev/null
+    # Activate the exact tab AND raise its window to the front.
+    osascript -e "tell application \"Google Chrome\"
+      set idx to 0
+      repeat with wi from 1 to (count of windows)
+        if (id of window wi as text) is \"$chrome_wid\" then set idx to wi
+      end repeat
+      if idx > 0 then
+        set active tab index of window idx to $tab_idx
+        set index of window idx to 1
+      end if
+      activate
+    end tell" 2>/dev/null
     ;;
   ws)
-    ws_name=$(echo "$prefix" | cut -d: -f2)
+    ws_name="${prefix#ws:}"
     aerospace workspace "$ws_name" 2>/dev/null
     ;;
 esac
