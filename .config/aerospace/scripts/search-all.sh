@@ -215,42 +215,47 @@ case "$itype" in
     log_pick "tab:${tab_url}"
     esc_url="${tab_url//\\/\\\\}"; esc_url="${esc_url//\"/\\\"}"
     # Activate the tab whose URL matches — prefer the cached window, then any.
+    # CRITICAL: reference windows by ID (window id X), never by positional index,
+    # because `set index ... to 1` reorders windows and would invalidate a saved
+    # position (this caused the wrong tab to be activated).
     resolved_title=$(osascript -e "tell application \"Google Chrome\"
       set targetURL to \"$esc_url\"
-      set foundWin to missing value
+      set foundId to missing value
       set foundTab to 0
-      repeat with wi from 1 to (count of windows)
-        if (id of window wi as text) is \"$chrome_wid\" then
-          set tabs_u to URL of tabs of window wi
+      -- Pass 1: the cached window (by id), matched by URL.
+      repeat with w in windows
+        if (id of w as text) is \"$chrome_wid\" then
+          set tabs_u to URL of tabs of w
           repeat with ti from 1 to (count of tabs_u)
             if (item ti of tabs_u) is targetURL then
-              set foundWin to wi
+              set foundId to (id of w as text)
               set foundTab to ti
               exit repeat
             end if
           end repeat
         end if
+        if foundId is not missing value then exit repeat
       end repeat
-      if foundWin is missing value then
-        repeat with wi from 1 to (count of windows)
-          set tabs_u to URL of tabs of window wi
+      -- Pass 2: any window, matched by URL.
+      if foundId is missing value then
+        repeat with w in windows
+          set tabs_u to URL of tabs of w
           repeat with ti from 1 to (count of tabs_u)
             if (item ti of tabs_u) is targetURL then
-              set foundWin to wi
+              set foundId to (id of w as text)
               set foundTab to ti
               exit repeat
             end if
           end repeat
-          if foundWin is not missing value then exit repeat
+          if foundId is not missing value then exit repeat
         end repeat
       end if
-      if foundWin is not missing value then
-        set active tab index of window foundWin to foundTab
-        set index of window foundWin to 1
-        activate
-        return (title of active tab of window foundWin)
-      end if
-      return \"\"
+      if foundId is missing value then return \"\"
+      -- Operate strictly via `window id` so reordering can't misdirect us.
+      set active tab index of (window id (foundId as integer)) to foundTab
+      set index of (window id (foundId as integer)) to 1
+      activate
+      return (title of active tab of (window id (foundId as integer)))
     end tell" 2>/dev/null)
     # Focus the correct AeroSpace Chrome window by its (now-updated) title.
     aero_wid=""
